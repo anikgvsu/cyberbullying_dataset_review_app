@@ -24,3 +24,5 @@ __pycache__/
 # CSV/logs (optional, if generated)
 *.log
 *.csv
+
+keys/

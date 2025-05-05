@@ -3,6 +3,19 @@ import json
 import pandas as pd
 import os
 
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
+
+@st.cache_resource
+def connect_to_gsheet():
+    import json
+    scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+    creds = json.loads(st.secrets["GCP_SERVICE_ACCOUNT"])
+    credentials = ServiceAccountCredentials.from_json_keyfile_dict(creds, scope)
+    client = gspread.authorize(credentials)
+    return client.open_by_key(st.secrets["GOOGLE_SHEET_ID"]).sheet1
+
+
 # ---- INIT STATE ----
 if "index" not in st.session_state:
     st.session_state.index = 0
@@ -110,26 +123,21 @@ comments = st.text_area("💬 Optional Comments")
 
 # ---- SAVE FUNCTION ----
 def save_review(entry, cyberbullying_presence, content_authenticity, comments, reviewer_id):
-    review = {
-        "id": entry["id"],
-        "reviewer": reviewer_id,
-        "bullying_type": entry["bullying_type"],
-        "age_group": entry["age_group"],
-        "scenario": entry["scenario"],
-        "cyberbullying_presence": cyberbullying_presence,
-        "content_authenticity": content_authenticity,
-        "comments": comments
-    }
+    sheet = connect_to_gsheet()
+    row = [
+        entry["id"],
+        reviewer_id,
+        entry["bullying_type"],
+        entry["age_group"],
+        entry["scenario"],
+        cyberbullying_presence,
+        content_authenticity,
+        comments,
+        pd.Timestamp.now().isoformat()
+    ]
+    sheet.append_row(row)
+    st.success("✅ Review saved to Google Sheets!")
 
-    if os.path.exists(REVIEW_FILE) and os.path.getsize(REVIEW_FILE) > 0:
-        df = pd.read_csv(REVIEW_FILE)
-        df = df[~((df["id"] == entry["id"]) & (df["reviewer"] == reviewer_id))]
-        df = pd.concat([df, pd.DataFrame([review])], ignore_index=True)
-    else:
-        df = pd.DataFrame([review])
-
-
-    df.to_csv(REVIEW_FILE, index=False)
     st.success("✅ Review saved!")
 
     # Auto advance
