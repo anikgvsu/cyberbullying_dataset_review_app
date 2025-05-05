@@ -73,14 +73,37 @@ with st.sidebar:
 
     st.markdown("---")
     st.markdown("""
+Welcome to the **Cyberbullying Conversation Review Tool**.
+
+Please read the conversation carefully and evaluate it using the following two metrics:
+
+---
+
 ### 🚨 Cyberbullying Presence  
-Rate how clearly the conversation shows signs of cyberbullying  
-(1 = none, 5 = very strong)
+**Definition**: How clearly does the conversation show signs of cyberbullying?  
+**Consider**:  
+- Intentional harm  
+- Power imbalance  
+- Repetition or escalation  
+- Use of bullying tactics (mocking, threats, exclusion, etc.)  
+**Scale**:  
+1 = None → 5 = Strong evidence of cyberbullying
+
+---
 
 ### 🧠 Content Authenticity  
-Rate how natural and realistic the conversation feels  
-(1 = fake/stilted, 5 = highly realistic)
-""")
+**Definition**: How realistic and natural is the conversation for the stated age group and context?  
+**Consider**:  
+- Language style and tone  
+- Flow and coherence  
+- Age-appropriate expressions  
+**Scale**:  
+1 = Fake/stilted → 5 = Highly realistic
+
+---
+
+✅ After rating, add any optional comments and click **Save Review**.
+    """)
 
 # ---- SKIP LOGIC ----
 if skip_reviewed and reviewer_id:
