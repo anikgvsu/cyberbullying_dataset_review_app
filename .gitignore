@@ -1,0 +1,26 @@
+# Python virtual environment
+venv/
+
+# Streamlit secrets (don't push credentials!)
+.streamlit/secrets.toml
+
+# Bytecode and cache
+__pycache__/
+*.py[cod]
+
+# VS Code settings
+.vscode/
+
+# macOS files
+.DS_Store
+
+# Env or token files
+.env
+.env.*
+
+# Jupyter/IPython files (if used)
+.ipynb_checkpoints/
+
+# CSV/logs (optional, if generated)
+*.log
+*.csv
