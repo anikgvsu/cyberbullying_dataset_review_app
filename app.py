@@ -2,52 +2,57 @@ import streamlit as st
 import json
 import pandas as pd
 import os
-
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 
+# ---- Connect to Google Sheets ----
 @st.cache_resource
 def connect_to_gsheet():
-    import json
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
     creds = json.loads(st.secrets["GCP_SERVICE_ACCOUNT"])
     credentials = ServiceAccountCredentials.from_json_keyfile_dict(creds, scope)
     client = gspread.authorize(credentials)
     return client.open_by_key(st.secrets["GOOGLE_SHEET_ID"]).sheet1
 
-
-# ---- INIT STATE ----
+# ---- State Initialization ----
 if "index" not in st.session_state:
     st.session_state.index = 0
 
-# ---- FILES ----
+# ---- Config ----
 DATA_FILE = "cyberbullying_conversations_generated.json"
 REVIEW_FILE = "conversation_reviews.csv"
 
-# ---- LOAD DATA ----
+# ---- Load Data ----
 @st.cache_data
 def load_data():
     with open(DATA_FILE, "r", encoding="utf-8") as f:
-        return json.load(f)["cyberbullying_scenarios"]
+        return json.load(f)
 
 data = load_data()
 max_index = len(data) - 1
 
-# ---- LOAD REVIEWS ----
+# ---- Load Reviews ----
+review_columns = [
+    "id", "reviewer", "group", "type", "subtype", "platform",
+    "cyberbullying_presence", "content_authenticity", "comments", "timestamp"
+]
+
 if os.path.exists(REVIEW_FILE) and os.path.getsize(REVIEW_FILE) > 0:
-    review_df = pd.read_csv(REVIEW_FILE)
+    try:
+        review_df = pd.read_csv(REVIEW_FILE)
+    except Exception:
+        st.warning("⚠️ Could not read review file. Using empty fallback.")
+        review_df = pd.DataFrame(columns=review_columns)
 else:
-    review_df = pd.DataFrame(columns=["id", "reviewer"])
+    review_df = pd.DataFrame(columns=review_columns)
 
-
-# ---- TRACK REVIEWED ----
+# ---- Track Reviewed ----
 reviewed_pairs = set(zip(review_df["id"], review_df["reviewer"]))
-reviewed_ids = set(review_df["id"])
 completed = len(review_df["id"].unique())
 total = len(data)
 progress = int((completed / total) * 100)
 
-# ---- SIDEBAR ----
+# ---- Sidebar ----
 with st.sidebar:
     st.title("📋 Review Guide")
 
@@ -75,37 +80,26 @@ with st.sidebar:
     st.markdown("""
 Welcome to the **Cyberbullying Conversation Review Tool**.
 
-Please read the conversation carefully and evaluate it using the following two metrics:
+Please read the story and conversation carefully and evaluate it using the following two metrics:
 
 ---
 
 ### 🚨 Cyberbullying Presence  
 **Definition**: How clearly does the conversation show signs of cyberbullying?  
-**Consider**:  
-- Intentional harm  
-- Power imbalance  
-- Repetition or escalation  
-- Use of bullying tactics (mocking, threats, exclusion, etc.)  
 **Scale**:  
-1 = None → 5 = Strong evidence of cyberbullying
+1 = None → 5 = Strong evidence
 
 ---
 
 ### 🧠 Content Authenticity  
-**Definition**: How realistic and natural is the conversation for the stated age group and context?  
-**Consider**:  
-- Language style and tone  
-- Flow and coherence  
-- Age-appropriate expressions  
+**Definition**: How realistic and natural is the conversation for the platform and context?  
 **Scale**:  
 1 = Fake/stilted → 5 = Highly realistic
 
----
-
-✅ After rating, add any optional comments and click **Save Review**.
+✅ After rating, add optional comments and click **Save Review**.
     """)
 
-# ---- SKIP LOGIC ----
+# ---- Skip Reviewed ----
 if skip_reviewed and reviewer_id:
     while (data[st.session_state.index]["id"], reviewer_id) in reviewed_pairs:
         if st.session_state.index < max_index:
@@ -113,22 +107,21 @@ if skip_reviewed and reviewer_id:
         else:
             break
 
-# ---- DISPLAY ----
+# ---- Show Current Entry ----
 index = st.session_state.index
 entry = data[index]
 
-st.subheader(f"Scenario {index}: {entry['scenario']}")
-st.markdown(f"**Bullying Type**: {entry['bullying_type']} | **Age Group**: {entry['age_group']}")
+st.subheader(f"Conversation {entry['id']}")
+st.markdown(f"**Group**: {entry['group']}  \n**Type**: {entry['type']}  \n**Subtype**: {entry['subtype']}  \n**Platform**: {entry.get('platform', 'Unknown')}")
 
-if "mini_story" in entry:
-    st.markdown("### 📝 Mini Story")
-    st.info(entry["mini_story"])
+st.markdown("### 📝 Story")
+st.info(entry["story"])
 
-
-st.markdown("### Conversation")
+st.markdown("### 💬 Conversation")
 for turn in entry["conversation"]:
-    st.markdown(f"**{turn['role']}**: {turn['text']}")
+    st.markdown(f"**{turn['sender']}**: {turn['message']}")
 
+# ---- Evaluation Sliders ----
 st.markdown("---")
 st.markdown("### Evaluation")
 
@@ -144,15 +137,16 @@ content_authenticity = st.slider(
 
 comments = st.text_area("💬 Optional Comments")
 
-# ---- SAVE FUNCTION ----
+# ---- Save Review ----
 def save_review(entry, cyberbullying_presence, content_authenticity, comments, reviewer_id):
     sheet = connect_to_gsheet()
     row = [
         entry["id"],
         reviewer_id,
-        entry["bullying_type"],
-        entry["age_group"],
-        entry["scenario"],
+        entry["group"],
+        entry["type"],
+        entry["subtype"],
+        entry["platform"],
         cyberbullying_presence,
         content_authenticity,
         comments,
@@ -161,14 +155,12 @@ def save_review(entry, cyberbullying_presence, content_authenticity, comments, r
     sheet.append_row(row)
     st.success("✅ Review saved to Google Sheets!")
 
-    st.success("✅ Review saved!")
-
-    # Auto advance
+    # Auto-advance
     if st.session_state.index < max_index:
         st.session_state.index += 1
         st.rerun()
 
-# ---- SAVE BUTTON ----
+# ---- Save Button ----
 if reviewer_id.strip() == "":
     st.warning("Please enter your name or ID in the sidebar to save your review.")
 else:
